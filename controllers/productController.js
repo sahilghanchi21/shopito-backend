@@ -1,151 +1,131 @@
 const asyncHandler = require("express-async-handler");
 const Product = require("../models/productModel");
-const { fileSizeFormatter } = require("../utils/fileUpload");
-const cloudinary = require("cloudinary").v2;
+const { request } = require("express");
 const mongoose = require("mongoose");
-const { ObjectId } = mongoose.Schema;
 
-// Create Prouct
-const createProduct = asyncHandler(async (req, res) => {
+//Create Product
+const createProduct = asyncHandler(async (req, res, next) => {
   const {
     name,
+    description,
+    price,
     sku,
     category,
     brand,
     quantity,
-    price,
-    description,
     image,
     regularPrice,
     color,
   } = req.body;
 
-  //   Validation
-  if (!name || !category || !brand || !quantity || !price || !description) {
-    res.status(400);
+  if (!name || !description || !price || !category || !brand || !quantity) {
+    res.send(400);
     throw new Error("Please fill in all fields");
   }
 
-  // Create Product
   const product = await Product.create({
-    // user: req.user.id,
     name,
+    description,
+    price,
     sku,
     category,
-    quantity,
     brand,
-    price,
-    description,
+    quantity,
     image,
     regularPrice,
     color,
   });
-
   res.status(201).json(product);
 });
 
-// Get all Products
-const getProducts = asyncHandler(async (req, res) => {
+//Get Product
+
+const getProducts = asyncHandler(async (req, res, next) => {
   const products = await Product.find().sort("-createdAt");
   res.status(200).json(products);
 });
 
-// Get single product
-const getProduct = asyncHandler(async (req, res) => {
+//Get Single Product
+
+const getProduct = asyncHandler(async (req, res, next) => {
   const product = await Product.findById(req.params.id);
-  // if product doesnt exist
   if (!product) {
     res.status(404);
     throw new Error("Product not found");
   }
-
   res.status(200).json(product);
 });
 
-// Delete Product
-const deleteProduct = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
-  // if product doesnt exist
+//Delete Product
+
+const deleteProduct = asyncHandler(async (req, res, next) => {
+  const product = await Product.findByIdAndDelete(req.params.id);
   if (!product) {
     res.status(404);
     throw new Error("Product not found");
   }
-
-  await product.remove();
-  res.status(200).json({ message: "Product deleted." });
+  res.status(200).json({
+    message: "Product deleted successfully",
+  });
 });
 
-// Update Product
-const updateProduct = asyncHandler(async (req, res) => {
+//Update Product
+
+const updateProduct = asyncHandler(async (req, res, next) => {
   const {
     name,
+    description,
+    price,
+
     category,
     brand,
     quantity,
-    price,
-    description,
     image,
     regularPrice,
     color,
   } = req.body;
-  const { id } = req.params;
 
-  const product = await Product.findById(id);
-
-  // if product doesnt exist
+  const product = await Product.findById(req.params.id);
   if (!product) {
     res.status(404);
     throw new Error("Product not found");
   }
 
-  // Update Product
-  const updatedProduct = await Product.findByIdAndUpdate(
-    { _id: id },
+  //Update Product
+  const updateProduct = await Product.findByIdAndUpdate(
+    { _id: req.params.id },
     {
       name,
+      description,
+      price,
       category,
       brand,
       quantity,
-      price,
-      description,
       image,
       regularPrice,
       color,
     },
-    {
-      new: true,
-      runValidators: true,
-    }
+    { new: true, runValidators: true }
   );
-
-  res.status(200).json(updatedProduct);
+  res.status(200).json(updateProduct);
 });
 
-// Review Product
+//Review Product
 const reviewProduct = asyncHandler(async (req, res) => {
-  // star, review
   const { star, review, reviewDate } = req.body;
   const { id } = req.params;
 
-  // validation
+  // Validation
   if (star < 1 || !review) {
-    res.status(400);
-    throw new Error("Please add star and review");
+    res.status(400).json({ error: "Please add a star and review" });
   }
 
   const product = await Product.findById(id);
-
-  // if product doesnt exist
   if (!product) {
-    res.status(404);
-    throw new Error("Product not found");
-  }
-  if (!product) {
-    res.status(404);
-    throw new Error("Product not found");
+    res.status(404).json({ error: "Product not found" });
   }
 
-  // Update Product
+  // Update rating
   product.ratings.push({
     star,
     review,
@@ -154,70 +134,92 @@ const reviewProduct = asyncHandler(async (req, res) => {
     userID: req.user._id,
   });
   product.save();
-
-  res.status(200).json({ message: "Product review added." });
+  res.status(200).json({ message: "Product review added successfully" });
 });
 
-// Delete Product
+//Delete Review
+
 const deleteReview = asyncHandler(async (req, res) => {
   const { userID } = req.body;
-
   const product = await Product.findById(req.params.id);
-  // if product doesnt exist
   if (!product) {
     res.status(404);
     throw new Error("Product not found");
   }
-
   const newRatings = product.ratings.filter((rating) => {
     return rating.userID.toString() !== userID.toString();
   });
-  console.log(newRatings);
   product.ratings = newRatings;
   product.save();
-  res.status(200).json({ message: "Product rating deleted!!!." });
+  res.status(200).json({ message: "Review deleted successfully" });
 });
 
-// Edit Review
+//Update Review
 const updateReview = asyncHandler(async (req, res) => {
   const { star, review, reviewDate, userID } = req.body;
   const { id } = req.params;
-
-  // validation
+  // Validation
   if (star < 1 || !review) {
-    res.status(400);
-    throw new Error("Please add star and review");
+    res.status(400).json({ error: "Please add a star and review" });
   }
 
   const product = await Product.findById(id);
-
-  // if product doesnt exist
   if (!product) {
-    res.status(404);
-    throw new Error("Product not found");
+    res.status(404).json({ error: "Product not found" });
   }
-  // Match user to review
+  //Match user to review
   if (req.user._id.toString() !== userID) {
     res.status(401);
-    throw new Error("User not authorized");
+    throw new Error("You are not authorized to update this review");
   }
 
-  // // Update Product review
-  const updatedReview = await Product.findOneAndUpdate(
-    { _id: product._id, "ratings.userID": mongoose.Types.ObjectId(userID) },
-    {
-      $set: {
-        "ratings.$.star": Number(star),
-        "ratings.$.review": review,
-        "ratings.$.reviewDate": reviewDate,
+  //Update product review
+  //   const updateReview = await Product.findOneAndUpdate(
+  //     {
+  //       _id: product._id,
+  //       "ratings.userID": userID,
+  //       //   "ratings.userID": mongoose.Types.ObjectId(userID),
+  //     },
+  //     {
+  //       $set: {
+  //         "ratings.$.star": star,
+  //         "ratings.$.review": review,
+  //         "ratings.$.reviewDate": reviewDate,
+  //       },
+  //     },
+  //     { new: true }
+  //   );
+  //   if (updateReview) {
+  //     res.status(200).json({ message: "Product review updated successfully" });
+  //   } else {
+  //     res.status(400).json({ message: "Product review not updated" });
+  //   }
+  try {
+    const updateReview = await Product.findOneAndUpdate(
+      {
+        _id: product._id,
+        "ratings.userID": mongoose.Types.ObjectId(userID),
+        // "ratings.userID": userID,
       },
-    }
-  );
+      {
+        $set: {
+          "ratings.$.star": star,
+          "ratings.$.review": review,
+          "ratings.$.reviewDate": reviewDate,
+        },
+      },
+      { new: true }
+    );
 
-  if (updatedReview) {
-    res.status(200).json({ message: "Product review updated." });
-  } else {
-    res.status(400).json({ message: "Product review NOT updated." });
+    if (updateReview) {
+      res.status(200).json({ message: "Product review updated successfully" });
+    } else {
+      console.log(updateReview);
+      res.status(400).json({ message: "Product review not updated" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 

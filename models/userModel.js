@@ -2,11 +2,12 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 const { ObjectId } = mongoose.Schema;
 
-const userSchema = mongoose.Schema(
+const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
       required: [true, "Please add a name"],
+      trim: true,
     },
     email: {
       type: String,
@@ -14,15 +15,14 @@ const userSchema = mongoose.Schema(
       unique: true,
       trim: true,
       match: [
-        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
-        "Please enter a valid emaial",
+        /^[a-zA-Z0-9_.+]*[a-zA-Z][a-zA-Z0-9_.+]*@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/,
+        "Please enter a valid email",
       ],
     },
     password: {
       type: String,
       required: [true, "Please add a password"],
-      minLength: [6, "Password must be up to 6 characters"],
-      //   maxLength: [23, "Password must not be more than 23 characters"],
+      minLength: [8, "Password must be up to 8 characters"],
     },
     role: {
       type: String,
@@ -33,31 +33,15 @@ const userSchema = mongoose.Schema(
     photo: {
       type: String,
       required: [true, "Please add a photo"],
-      default: "https://i.ibb.co/4pDNDk1/avatar.png",
+      default:
+        "https://img.freepik.com/free-vector/businessman-character-avatar-isolated_24877-60111.jpg?w=740&t=st=1698760435~exp=1698761035~hmac=8b2f5fc7d339ed47f0601883eab828dcd69c6c56efc78a8b4d294a1ef1524357",
     },
     phone: {
       type: String,
-      default: "+234",
+      default: "+91",
     },
     address: {
       type: Object,
-      // address, state, country
-    },
-    wishlist: [{ type: ObjectId, ref: "Product" }],
-    balance: {
-      type: Number,
-      default: 0,
-    },
-    cartItems: {
-      type: [Object],
-    },
-    isVerified: {
-      type: Boolean,
-      default: false,
-    },
-    stripeCustomerId: {
-      type: String,
-      // required: true,
     },
   },
   {
@@ -65,13 +49,13 @@ const userSchema = mongoose.Schema(
   }
 );
 
-//   Encrypt password before saving to DB
+//Encrypt password before saving to db
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     return next();
   }
 
-  // Hash password
+  //Hash password
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(this.password, salt);
   this.password = hashedPassword;
